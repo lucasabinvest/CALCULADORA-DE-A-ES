@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preço teto e preço justo</title>
+<style>
+:root{--bg:#faf8f3;--card:#fff;--ink:#2b2718;--mut:#6f6a58;--line:#e4dfce;--gold:#b8860b;--ok:#2f7d32;--bad:#b3392b}
+@media(prefers-color-scheme:dark){:root{--bg:#16140d;--card:#201d12;--ink:#f1ecd9;--mut:#a39c84;--line:#37321f;--gold:#e0a82e;--ok:#6fcf74;--bad:#f0877a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Georgia,"Times New Roman",serif;padding:16px;max-width:760px;margin-inline:auto}
+h1{font-size:1.5rem;margin:.2rem 0}
+p.s{color:var(--mut);margin:.2rem 0 1rem;font-size:.9rem}
+.prem{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:16px}
+label{display:block;font:12px system-ui,sans-serif;color:var(--mut)}
+input{width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font:14px system-ui,sans-serif}
+input:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:6px;padding:12px;margin-bottom:12px}
+.card.ok{border-left-color:var(--ok)}.card.bad{border-left-color:var(--bad)}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.top b{font-size:1.15rem}.top span{color:var(--mut);font-size:.85rem}
+.sig{margin:.3rem 0;font:600 13px system-ui,sans-serif}
+.ok .sig{color:var(--ok)}.bad .sig{color:var(--bad)}
+.res{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;font:13px system-ui,sans-serif}
+.res div{background:var(--bg);padding:6px;border-radius:5px}
+.res small{display:block;color:var(--mut);font-size:11px}
+details{margin-top:6px}summary{cursor:pointer;color:var(--gold);font:600 13px system-ui,sans-serif}
+.in{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-top:8px}
+.note{font-size:.8rem;color:var(--mut);margin-top:6px}
+footer{color:var(--mut);font-size:.8rem;margin:16px 0}
+button{font:600 13px system-ui,sans-serif;padding:7px 12px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer}
+</style>
+</head>
+<body>
+<h1>Preço teto e preço justo</h1>
+<p class="s">Bazin, Graham e Gordon. Dados de 12/11/2026 (Investidor10 e Dados de Mercado). Edite qualquer campo: o cálculo atualiza na hora.</p>
+<div class="prem" id="prem"></div>
+<div id="list"></div>
+<p><button id="reset">Restaurar dados originais</button></p>
+<footer>Referências de valuation, não recomendação de investimento. Bazin = dividendo médio ÷ yield mínimo; Graham = √(22,5 × LPA × VPA); Gordon = D1 ÷ (k − g). O teto de referência é o menor valor entre os métodos do ativo.</footer>
+<script>
+const DEF_PREM={bazin:6,bazin2:8,k:12,g:2,margem:0};
+const PREM_LABEL={bazin:"Yield mín. Bazin (%)",bazin2:"Yield conserv. (%)",k:"Retorno exigido k (%)",g:"Crescimento g (%)",margem:"Margem de segurança (%)"};
+const DEF=[
+{t:"BBDC4",n:"Bradesco",m:["bazin","graham"],c:14.32,lpa:2.34,vpa:17.42,d:[1.0264,0.4243,1.6969,1.1143,1.4362],d1:null,obs:"Cotação caiu forte após a eleição e o 3T26."},
+{t:"CXSE3",n:"Caixa Seguridade",m:["bazin","gordon"],c:21.58,lpa:1.52,vpa:4.67,d:[0.2446,0.6486,1,1.0646,1.26],d1:1.39,obs:"2021 é parcial (IPO em abril). D1 = 4 últimos dividendos declarados."},
+{t:"BBAS3",n:"Banco do Brasil",m:["bazin","graham"],c:15.48,lpa:1.92,vpa:32.48,d:[1.1311,2.0694,2.2701,2.5972,1.1704],d1:null,obs:"Lucro do 3T26 caiu 66,5% e o payout foi reduzido: a média de 5 anos superestima o dividendo futuro."},
+{t:"ITSA4",n:"Itaúsa",m:["bazin","graham"],c:13.57,lpa:1.51,vpa:8.04,d:[0.3942,0.614,0.5847,0.6657,1.7577],d1:null,obs:"2025 inclui dividendos extraordinários."},
+{t:"BBSE3",n:"BB Seguridade",m:["bazin","gordon"],c:37.68,lpa:4.73,vpa:6.94,d:[0.9957,1.9532,3.4475,2.6328,4.2144],d1:4.53,obs:"D1 = fev/26 + ago/26. Mesmo grupo do BBAS3."},
+{t:"CMIG4",n:"Cemig",m:["bazin"],c:10.62,lpa:1.69,vpa:10.09,d:[1.176,1.5323,1.2907,1.4254,1.6506],d1:null,obs:"Risco político (controle estatal de MG)."},
+{t:"TAEE11",n:"Taesa (unit)",m:["gordon","bazin"],c:41.57,lpa:4.78,vpa:23.87,d:[4.5037,4.8546,2.9145,3.5325,3.2293],d1:2.96,obs:"2021-22 têm extraordinários. D1 = dividendos dos últimos 12 meses."}
+];
+const KEY="preco-teto-v1";
+let S;
+function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return null}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function fresh(){return JSON.parse(JSON.stringify({prem:DEF_PREM,rows:DEF}))}
+S=load()||fresh();
+const brl=v=>isFinite(v)&&v!==null?v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"-";
+const num=v=>(v===null||v===""||isNaN(+v))?null:+v;
+function calc(a){
+  const p=S.prem,ds=a.d.map(num).filter(x=>x!==null);
+  const avg=ds.length?ds.reduce((x,y)=>x+y,0)/ds.length:null;
+  const bazin=avg!==null?avg/(p.bazin/100):null;
+  const bazin2=avg!==null?avg/(p.bazin2/100):null;
+  const l=num(a.lpa),v=num(a.vpa);
+  const graham=(l>0&&v>0)?Math.sqrt(22.5*l*v):null;
+  const d1=num(a.d1)!==null?num(a.d1):(avg!==null?avg*(1+p.g/100):null);
+  const gordon=(d1!==null&&p.k>p.g)?d1/((p.k-p.g)/100):null;
+  const vals=a.m.map(m=>({bazin,graham,gordon})[m]).filter(x=>x!==null);
+  const ref=vals.length?Math.min(...vals):null;
+  const alvo=ref!==null?ref*(1-p.margem/100):null;
+  return{avg,bazin,bazin2,graham,gordon,ref,alvo,d1};
+}
+function render(){
+  const pe=document.getElementById("prem");pe.innerHTML="";
+  for(const k in PREM_LABEL){const w=document.createElement("div");
+    w.innerHTML=`<label>${PREM_LABEL[k]}<input type="number" step="0.5" value="${S.prem[k]}" data-p="${k}"></label>`;pe.append(w)}
+  const L=document.getElementById("list");L.innerHTML="";
+  S.rows.forEach((a,i)=>{
+    const r=calc(a),c=num(a.c);
+    let cls="",sig="Preencha cotação e dados";
+    if(r.alvo!==null&&c!==null){const ok=c<=r.alvo;cls=ok?"ok":"bad";
+      sig=ok?`Abaixo do alvo (${((c/r.alvo-1)*100).toFixed(0)}%): bom ponto de aporte`:`Acima do alvo (+${((c/r.alvo-1)*100).toFixed(0)}%): aguardar`}
+    const e=document.createElement("div");e.className="card "+cls;
+    e.innerHTML=`<div class="top"><b>${a.t}</b><span>${a.n} · cotação ${brl(c)}</span></div>
+    <div class="sig">${sig}</div>
+    <div class="res">
+      <div><small>Teto de referência</small>${brl(r.ref)}</div>
+      <div><small>Alvo de compra</small>${brl(r.alvo)}</div>
+      <div><small>Método(s)</small>${a.m.join(" + ")}</div>
+      <div><small>Bazin ${S.prem.bazin}%</small>${brl(r.bazin)}</div>
+      <div><small>Bazin ${S.prem.bazin2}%</small>${brl(r.bazin2)}</div>
+      <div><small>Graham</small>${brl(r.graham)}</div>
+      <div><small>Gordon</small>${brl(r.gordon)}</div>
+      <div><small>Div. médio 5a</small>${brl(r.avg)}</div>
+      <div><small>D1 usado</small>${brl(r.d1)}</div>
+    </div>
+    <div class="note">${a.obs}</div>
+    <details><summary>Editar dados</summary><div class="in">
+      <label>Cotação<input type="number" step="0.01" value="${a.c??""}" data-i="${i}" data-f="c"></label>
+      <label>LPA<input type="number" step="0.01" value="${a.lpa??""}" data-i="${i}" data-f="lpa"></label>
+      <label>VPA<input type="number" step="0.01" value="${a.vpa??""}" data-i="${i}" data-f="vpa"></label>
+      <label>D1 (opcional)<input type="number" step="0.01" value="${a.d1??""}" data-i="${i}" data-f="d1"></label>
+      ${a.d.map((x,j)=>`<label>Div. ano ${j+1}<input type="number" step="0.01" value="${x??""}" data-i="${i}" data-f="d" data-j="${j}"></label>`).join("")}
+    </div></details>`;
+    L.append(e);
+  });
+}
+document.addEventListener("change",e=>{
+  const t=e.target;if(t.tagName!=="INPUT")return;
+  if(t.dataset.p){S.prem[t.dataset.p]=+t.value}
+  else{const a=S.rows[t.dataset.i],v=t.value===""?null:+t.value;
+    if(t.dataset.f==="d")a.d[t.dataset.j]=v;else a[t.dataset.f]=v}
+  save();
+  const open=[...document.querySelectorAll("details")].map(x=>x.open);
+  render();document.querySelectorAll("details").forEach((x,i)=>x.open=open[i]);
+});
+document.getElementById("reset").onclick=()=>{S=fresh();save();render()};
+render();
+</script>
+</body>
+</html>
